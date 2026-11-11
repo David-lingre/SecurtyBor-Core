@@ -1,9 +1,14 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import time
 
 app = Flask(__name__)
+
+# Configuración de clave secreta para la firma de tokens
+app.config["SECRET_KEY"] = "securtybor-core-super-secure-key-2026"
+serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"])
 
 # ==========================================
 # CAPA 1: DEFENSAS GLOBALES Y CONTROL DE RED
@@ -11,12 +16,12 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
 request_records = {}
-MAX_REQUESTS = 20  # Límite ajustado para permitir pruebas de login/registro
-TIME_WINDOW = 60
+MAX_REQUESTS = 20  
+TIME_WINDOW = 60   
 
 @app.before_request
 def limit_traffic():
-    """Middleware que protege TODOS los endpoints contra DoS y Fuerza Bruta."""
+    """Middleware global que protege todos los endpoints contra DoS y Fuerza Bruta."""
     client_ip = request.remote_addr or "127.0.0.1"
     current_time = time.time()
     
@@ -34,7 +39,6 @@ def limit_traffic():
 # ==========================================
 # CAPA 2: AUTENTICACIÓN Y HASHING (STRIDE: Spoofing)
 # ==========================================
-# Base de datos en memoria (diccionario) para mantener la arquitectura ágil en esta fase
 users_db = {}
 
 @app.route("/register", methods=["POST"])
@@ -49,11 +53,10 @@ def register():
     if username in users_db:
         return jsonify({"error": "Conflicto: El usuario ya existe"}), 409
         
-    # Cifrado unidireccional (hashing) de la contraseña antes de guardarla
     hashed_password = generate_password_hash(password)
     users_db[username] = hashed_password
     
-    return jsonify({"message": f"Usuario '{username}' registrado con seguridad."}), 201
+    return jsonify({"message": f"Usuario '{username}' registrado exitosamente."}), 201
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -63,19 +66,49 @@ def login():
         
     username = data["username"]
     password = data["password"]
-    
-    # Práctica OWASP: Mensaje de error genérico para no revelar si el usuario existe o no
     generic_error = {"error": "Credenciales inválidas"}
     
     if username not in users_db:
         return jsonify(generic_error), 401
         
-    # Verificación segura del hash contra la contraseña en texto plano recibida
     if check_password_hash(users_db[username], password):
-        # En la Capa 3 cambiaremos este string por un JWT real firmado
-        return jsonify({"message": "Autenticación exitosa", "token": "TBD_JWT_CAPA_3"}), 200
+        # CAPA 3: Generación de token firmado digitalmente con expiración (1 hora)
+        token = serializer.dumps(username)
+        return jsonify({
+            "message": "Autenticación exitosa",
+            "token": token,
+            "token_type": "Bearer",
+            "expires_in": "3600 seconds"
+        }), 200
         
     return jsonify(generic_error), 401
+
+
+# ==========================================
+# CAPA 3: AUTORIZACIÓN Y RECURSOS PROTEGIDOS
+# ==========================================
+@app.route("/protected-resource", methods=["GET"])
+def protected_resource():
+    auth_header = request.headers.get("Authorization")
+    
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Token de autorización ausente o malformado"}), 401
+        
+    token = auth_header.split(" ")[1]
+    
+    try:
+        username = serializer.loads(token, max_age=3600)
+    except SignatureExpired:
+        return jsonify({"error": "El token ha expirado. Por favor inicie sesión nuevamente."}), 401
+    except BadSignature:
+        return jsonify({"error": "Token inválido o manipulado."}), 401
+
+    return jsonify({
+        "status": "Acceso concedido al recurso restringido",
+        "authenticated_user": username,
+        "layer": "3 - Autorización mediante Tokens Firmados",
+        "protection": "Active (Anti-Elevation of Privilege)"
+    })
 
 
 # ==========================================
@@ -85,8 +118,8 @@ def login():
 def health_check():
     return jsonify({
         "status": "SecurtyBor Core running securely",
-        "layer": "2 - Autenticación y Hashing",
-        "protection": "Active (Anti-DoS & Anti-Spoofing)"
+        "layers_active": "Capa 1 (Anti-DoS/CORS), Capa 2 (Hashing/Spoofing), Capa 3 (Tokens Firmados)",
+        "protection": "Fully Operational"
     })
 
 if __name__ == "__main__":
