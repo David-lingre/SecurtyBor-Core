@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecurtyBor-Core | Panel de Control Criptográfico</title>
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --card-bg: #161b22;
+            --border: #30363d;
+            --text-main: #c9d1d9;
+            --accent: #2ea043;
+            --accent-hover: #3fb950;
+            --danger: #f85149;
+            --info: #58a6ff;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 { margin: 0; font-size: 1.6rem; color: #fff; }
+        .badge {
+            background: rgba(46, 160, 67, 0.2);
+            color: var(--accent-hover);
+            border: 1px solid var(--accent);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .card h2 { margin-top: 0; font-size: 1.15rem; color: var(--info); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0 15px 0;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: #fff;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-bottom: 8px;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-info { background: #1f6feb; color: #fff; }
+        .btn-info:hover { background: #388bfd; }
+        .btn-danger { background: rgba(248, 81, 73, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: #fff; }
+        .console {
+            background: #010409;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 250px;
+            overflow-y: auto;
+            color: #7ee787;
+        }
+        .token-box {
+            background: #010409;
+            padding: 10px;
+            border: 1px dashed var(--info);
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            margin-bottom: 15px;
+            color: #a5d6ff;
+            min-height: 40px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div>
+            <h1>🛡️ SecurtyBor-Core</h1>
+            <small>Arquitectura CIA • STRIDE • OWASP • Criptografía Aplicada</small>
+        </div>
+        <span class="badge" id="statusBadge">Verificando estado...</span>
+    </header>
+
+    <div class="grid">
+        <!-- CAPA 2: REGISTRO Y LOGIN -->
+        <div class="card">
+            <h2>1. Identidad (Capa 2 - Spoofing)</h2>
+            <label>Usuario</label>
+            <input type="text" id="username" placeholder="Ej. admin_sec">
+            <label>Contraseña</label>
+            <input type="password" id="password" placeholder="••••••••">
+            <button class="btn-info" onclick="registerUser()">Registrar Usuario (Hash)</button>
+            <button class="btn-primary" onclick="loginUser()">Iniciar Sesión (Obtener Token)</button>
+        </div>
+
+        <!-- CAPA 3: CONFIDENCIALIDAD E INTEGRIDAD -->
+        <div class="card">
+            <h2>2. Sesión Cifrada (Capa 3 - AES + HMAC)</h2>
+            <label>Token Cifrado Actual (Confidencialidad):</label>
+            <div class="token-box" id="tokenDisplay">Ningún token activo. Inicia sesión primero.</div>
+            <button class="btn-primary" onclick="accessProtected(false)">Acceder a Recurso Protegido</button>
+            <button class="btn-danger" onclick="accessProtected(true)">Simular Ataque (Alterar Token)</button>
+        </div>
+    </div>
+
+    <!-- CONSOLA DE RESPUESTA -->
+    <div class="card" style="margin-bottom: 20px;">
+        <h2>Salida del Núcleo de Seguridad (Respuesta API)</h2>
+        <div class="console" id="apiConsole">Esperando operaciones...</div>
+    </div>
+
+    <!-- NO REPUDIO: CADENA DE AUDITORÍA -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 style="border:none; margin:0; padding:0;">3. Bitácora Inmutable (No Repudio - Hash Chain)</h2>
+            <button class="btn-info" style="width: auto; padding: 6px 15px; margin:0;" onclick="loadAuditLogs()">Actualizar Cadena</button>
+        </div>
+        <div class="console" id="auditConsole" style="color: #d2a8ff;">Cargando registros criptográficos...</div>
+    </div>
+</div>
+
+<script>
+    let currentToken = "";
+
+    function logToConsole(data, isError = false) {
+        const consoleEl = document.getElementById("apiConsole");
+        consoleEl.style.color = isError ? "#ff7b72" : "#7ee787";
+        consoleEl.textContent = JSON.stringify(data, null, 2);
+        loadAuditLogs();
+    }
+
+    async function checkHealth() {
+        try {
+            const res = await fetch("/health");
+            const data = await res.json();
+            document.getElementById("statusBadge").textContent = "🟢 " + data.protection;
+        } catch (e) {
+            document.getElementById("statusBadge").textContent = "🔴 Desconectado";
+        }
+    }
+
+    async function registerUser() {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        const res = await fetch("/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        logToConsole(data, !res.ok);
+    }
+
+    async function loginUser() {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        const res = await fetch("/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.encrypted_token) {
+            currentToken = data.encrypted_token;
+            document.getElementById("tokenDisplay").textContent = currentToken;
+        }
+        logToConsole(data, !res.ok);
+    }
+
+    async function accessProtected(tamper) {
+        if (!currentToken) {
+            logToConsole({ error: "Primero debes iniciar sesión para obtener un token." }, true);
+            return;
+        }
+        let tokenToSend = currentToken;
+        if (tamper) {
+            // Alteramos el último carácter para demostrar fallo de Integridad
+            tokenToSend = tokenToSend.slice(0, -1) + (tokenToSend.slice(-1) === "A" ? "B" : "A");
+        }
+        const res = await fetch("/protected-resource", {
+            method: "GET",
+            headers: { "Authorization": "Bearer " + tokenToSend }
+        });
+        const data = await res.json();
+        logToConsole(data, !res.ok);
+    }
+
+    async function loadAuditLogs() {
+        const res = await fetch("/audit-logs");
+        const data = await res.json();
+        document.getElementById("auditConsole").textContent = JSON.stringify(data.audit_chain, null, 2);
+    }
+
+    checkHealth();
+    loadAuditLogs();
+</script>
+</body>
+</html>
